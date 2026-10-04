@@ -1,0 +1,1797 @@
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitPulse - Modern Habit & Life Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'scale-up': 'scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'pulse-subtle': 'pulseSubtle 2s infinite ease-in-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(6px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleUp: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(12px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        pulseSubtle: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-3px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Glassmorphism Styles */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .dark .glass-nav {
+            background: rgba(15, 23, 42, 0.85);
+        }
+
+        /* Custom Smooth Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+
+        /* Smooth interactive check mark animation */
+        .check-bounce {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .check-bounce:active {
+            transform: scale(0.85);
+        }
+
+        /* Smooth tab panel switching */
+        .tab-panel {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .tab-panel.hidden {
+            display: none;
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        .tab-panel:not(.hidden) {
+            animation: fadeIn 0.3s ease forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-full flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Active Alarm/Notification Banner -->
+    <div id="alarmBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-amber-500 text-slate-950 px-4 py-3 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-2 border-b-2 border-amber-600 animate-pulse-subtle">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-950/10 flex items-center justify-center text-slate-950 font-bold text-lg">
+                <i class="fa-solid fa-bell fa-bounce"></i>
+            </div>
+            <div>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-900/70">Scheduled Reminder Due</span>
+                <h4 id="alarmTitle" class="font-bold text-base leading-tight">Reminder Title</h4>
+                <p id="alarmTime" class="text-xs font-medium text-slate-900/80">Due Time</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="snoozeActiveAlarm(5)" class="px-3.5 py-1.5 bg-slate-950/10 hover:bg-slate-950/20 text-slate-950 rounded-xl text-xs font-bold transition-all transform active:scale-95">
+                <i class="fa-solid fa-clock mr-1"></i>Snooze 5m
+            </button>
+            <button onclick="dismissActiveAlarm()" class="px-4 py-1.5 bg-slate-950 text-white hover:bg-slate-900 rounded-xl text-xs font-bold transition-all shadow-md transform active:scale-95">
+                <i class="fa-solid fa-check mr-1"></i>Dismiss
+            </button>
+        </div>
+    </div>
+
+    <!-- Navigation Header -->
+    <header class="glass-nav sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 transition-transform hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-bolt text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 dark:from-sky-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent leading-none">HabitPulse</h1>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block mt-0.5">Habits, Events & Custom Categories</p>
+                </div>
+            </div>
+
+            <!-- Global Action Bar -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- Manage Custom Categories Button -->
+                <button onclick="openCategoryManagerModal()" class="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all hover:scale-105 active:scale-95" title="Manage Custom Categories">
+                    <i class="fa-solid fa-layer-group text-indigo-500"></i>
+                    <span class="hidden md:inline">Categories</span>
+                </button>
+
+                <!-- Browser Notification Permission Toggle -->
+                <button id="notifPermBtn" onclick="requestNotificationPermission()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all hover:scale-105 active:scale-95 relative" title="Notification Settings">
+                    <i class="fa-solid fa-bell text-sm"></i>
+                    <span id="notifBadge" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500"></span>
+                </button>
+
+                <!-- Dark/Light Theme Toggle -->
+                <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all hover:scale-105 active:scale-95" title="Toggle Theme">
+                    <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
+                </button>
+
+                <!-- Add Quick Event Button -->
+                <button onclick="openReminderModal()" class="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-calendar-plus"></i>
+                    <span class="hidden sm:inline">New Event</span>
+                </button>
+
+                <!-- Add Quick Habit Button -->
+                <button onclick="openHabitModal()" class="flex items-center space-x-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-sky-500/20 hover:shadow-sky-500/30 transition-all hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">New Habit</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        <!-- Navigation Tabs with Active Smooth Slider styling -->
+        <div class="relative mb-6">
+            <nav class="flex space-x-1 bg-slate-200/60 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 overflow-x-auto custom-scrollbar">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 shadow-sm whitespace-nowrap">
+                    <i class="fa-solid fa-chart-line text-sm"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button onclick="switchTab('reminders')" id="tab-reminders" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap">
+                    <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+                    <span>Agenda & Reminders</span>
+                </button>
+                <button onclick="switchTab('habits')" id="tab-habits" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap">
+                    <i class="fa-solid fa-list-check text-sm"></i>
+                    <span>Habits</span>
+                </button>
+                <button onclick="switchTab('calendar')" id="tab-calendar" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap">
+                    <i class="fa-regular fa-calendar-days text-sm"></i>
+                    <span>Calendar</span>
+                </button>
+                <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap">
+                    <i class="fa-regular fa-note-sticky text-sm"></i>
+                    <span>Notes & Journal</span>
+                </button>
+                <button onclick="switchTab('analytics')" id="tab-analytics" class="tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie text-sm"></i>
+                    <span>Analytics</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <div id="view-dashboard" class="tab-panel space-y-6">
+            <!-- Metric Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card p-5 rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Today's Habits</p>
+                        <h3 class="text-2xl font-black text-slate-800 dark:text-white" id="dashTodayProgress">0%</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="dashTodayCount">0 of 0 completed</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-regular fa-bell"></i>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Scheduled Today</p>
+                        <h3 class="text-2xl font-black text-slate-800 dark:text-white" id="dashRemindersCount">0</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="dashRemindersPending">0 pending events</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-fire"></i>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Best Streak</p>
+                        <h3 class="text-2xl font-black text-slate-800 dark:text-white" id="dashBestStreak">0 Days</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Keep momentum!</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Custom Categories</p>
+                        <h3 class="text-2xl font-black text-slate-800 dark:text-white" id="dashCategoriesCount">0</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Active tags</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Checklists & Chart Overview -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Today Habits Checklist -->
+                <div class="glass-card rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <i class="fa-solid fa-calendar-day text-sky-500"></i> Daily Habits
+                            </h2>
+                            <span class="text-[11px] font-bold px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300" id="dashDateString">Today</span>
+                        </div>
+                        <div id="dashboardHabitList" class="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                            <!-- JS inserted items -->
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-200/60 dark:border-slate-800/60 mt-4 flex justify-between items-center text-xs">
+                        <span class="text-slate-500">Target frequency: Daily</span>
+                        <button onclick="switchTab('habits')" class="text-sky-600 dark:text-sky-400 font-semibold hover:underline">Manage All &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- Scheduled Events Checklist -->
+                <div class="glass-card rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-indigo-500"></i> Today's Schedule
+                            </h2>
+                            <button onclick="openReminderModal()" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">+ New</button>
+                        </div>
+                        <div id="dashboardRemindersList" class="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                            <!-- JS inserted items -->
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-200/60 dark:border-slate-800/60 mt-4 flex justify-between items-center text-xs">
+                        <span class="text-slate-500">Google Calendar style sync</span>
+                        <button onclick="switchTab('reminders')" class="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">Full Agenda &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- Daily Breakdown Pie Chart -->
+                <div class="glass-card rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 dark:text-white mb-1">Completion Breakdown</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Ratio of today's completed targets</p>
+                    </div>
+                    <div class="w-full h-56 relative flex items-center justify-center">
+                        <canvas id="dashPieChart"></canvas>
+                    </div>
+                    <div class="text-center mt-4">
+                        <button onclick="switchTab('analytics')" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">Detailed Analytics &rarr;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-reminders" class="tab-panel hidden space-y-6">
+            <div class="glass-card p-4 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-filter text-slate-400 text-xs"></i>
+                        <select id="reminderFilterCategory" onchange="renderRemindersAgenda()" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <!-- Dynamically populated categories -->
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="reminderFilterPriority" onchange="renderRemindersAgenda()" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="ALL">All Priorities</option>
+                            <option value="High">High Priority</option>
+                            <option value="Medium">Medium Priority</option>
+                            <option value="Low">Low Priority</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="openReminderModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-calendar-plus mr-1"></i> New Reminder / Event
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="remindersAgendaGrid">
+                <!-- Grouped chronologically: Overdue, Today, Upcoming, Completed -->
+            </div>
+        </div>
+
+        <div id="view-habits" class="tab-panel hidden space-y-6">
+            <div class="glass-card p-4 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-filter text-slate-400 text-xs"></i>
+                    <select id="habitCategoryFilter" onchange="renderHabitsList()" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <!-- Dynamic Categories -->
+                    </select>
+                </div>
+                <button onclick="openHabitModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-plus mr-1"></i> Add New Habit
+                </button>
+            </div>
+
+            <div id="allHabitsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Habit Cards -->
+            </div>
+        </div>
+
+        <div id="view-calendar" class="tab-panel hidden space-y-6">
+            <div class="glass-card rounded-3xl p-6 shadow-sm">
+                <!-- Month Controller Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold text-slate-800 dark:text-white" id="calendarMonthYear">Month Year</h2>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="prevMonth()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all hover:scale-105 active:scale-95">
+                            <i class="fa-solid fa-chevron-left text-xs"></i>
+                        </button>
+                        <button onclick="currentMonth()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all hover:scale-105 active:scale-95">Today</button>
+                        <button onclick="nextMonth()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all hover:scale-105 active:scale-95">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Weekday Headers -->
+                <div class="grid grid-cols-7 text-center font-bold text-[11px] text-slate-400 uppercase tracking-wider mb-3">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+
+                <!-- Calendar Days Grid -->
+                <div id="calendarGrid" class="grid grid-cols-7 gap-2">
+                    <!-- Dynamic Calendar Tiles -->
+                </div>
+            </div>
+
+            <!-- Day Selected Detail Card -->
+            <div id="dayDetailCard" class="glass-card rounded-3xl p-6 shadow-sm hidden animate-fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-slate-800 dark:text-white" id="selectedDayTitle">Details for Day</h3>
+                    <button onclick="openReminderModalWithDate()" class="text-xs font-bold px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-all hover:scale-105 active:scale-95">
+                        + Add Event on this Date
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                            <i class="fa-regular fa-bell text-indigo-500"></i> Scheduled Events
+                        </h4>
+                        <div id="selectedDayReminders" class="space-y-2">
+                            <!-- Items -->
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-sky-500"></i> Habits Status
+                        </h4>
+                        <div id="selectedDayHabits" class="space-y-2">
+                            <!-- Items -->
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                            <i class="fa-regular fa-note-sticky text-amber-500"></i> Day Reflection / Note
+                        </h4>
+                        <textarea id="selectedDayNote" rows="3" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Journal thoughts for this day..."></textarea>
+                        <button onclick="saveDayNote()" class="mt-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition-all hover:scale-105 active:scale-95">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-notes" class="tab-panel hidden space-y-6">
+            <div class="glass-card p-4 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="noteSearchInput" onkeyup="renderNotes()" placeholder="Search notes by title, text, or tag..." class="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div class="flex items-center space-x-2">
+                    <select id="noteCategoryFilter" onchange="renderNotes()" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <!-- Dynamic Categories -->
+                    </select>
+                    <button onclick="openNoteModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> New Note
+                    </button>
+                </div>
+            </div>
+
+            <div id="notesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Dynamic Notes -->
+            </div>
+        </div>
+
+        <div id="view-analytics" class="tab-panel hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Custom Categories Completion Pie Chart -->
+                <div class="glass-card p-6 rounded-3xl shadow-sm">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-bold text-slate-800 dark:text-white">Completion by Category</h3>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Categories</span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Proportion of logged habits across your customized tags</p>
+                    <div class="w-full h-64 relative flex items-center justify-center">
+                        <canvas id="categoryPieChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Overall Goal Ratio Doughnut -->
+                <div class="glass-card p-6 rounded-3xl shadow-sm">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-bold text-slate-800 dark:text-white">Overall Habit Consistency</h3>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">All-Time Ratio</span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Completed targets vs pending checks ratio</p>
+                    <div class="w-full h-64 relative flex items-center justify-center">
+                        <canvas id="overallDoughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Performance Table -->
+            <div class="glass-card p-6 rounded-3xl shadow-sm">
+                <h3 class="text-base font-bold text-slate-800 dark:text-white mb-4">Habit Performance Breakdown</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                        <thead class="bg-slate-100/60 dark:bg-slate-800/60 uppercase text-[10px] text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700">
+                            <tr>
+                                <th class="p-3">Habit Name</th>
+                                <th class="p-3">Category Tag</th>
+                                <th class="p-3">Current Streak</th>
+                                <th class="p-3">Total Logs</th>
+                                <th class="p-3">Completion Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analyticsTableBody" class="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                            <!-- JS inserted rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CATEGORY MANAGER -->
+    <div id="categoryManagerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md hidden p-4 animate-fade-in">
+        <div class="glass-card rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up custom-scrollbar max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Manage Categories</h3>
+                <button onclick="closeCategoryManagerModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- Category Form -->
+            <form id="categoryForm" onsubmit="handleCategorySubmit(event)" class="space-y-4 mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
+                <input type="hidden" id="categoryId">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Category Name</label>
+                    <input type="text" id="categoryName" required placeholder="e.g. Mindfulness, Creative, Side-Hustle" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">FontAwesome Icon</label>
+                        <div class="relative">
+                            <input type="text" id="categoryIcon" required placeholder="fa-brain" value="fa-tag" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Category Color</label>
+                        <input type="color" id="categoryColor" value="#0ea5e9" class="w-full h-9 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 cursor-pointer">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="resetCategoryForm()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold">Reset</button>
+                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20">Save Category</button>
+                </div>
+            </form>
+
+            <!-- Existing Categories List -->
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Active Categories</h4>
+                <div id="categoryListContainer" class="space-y-2">
+                    <!-- Dynamic categories -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT HABIT -->
+    <div id="habitModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md hidden p-4 animate-fade-in">
+        <div class="glass-card rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4" id="habitModalTitle">Add New Habit</h3>
+            <form id="habitForm" onsubmit="handleHabitSubmit(event)" class="space-y-4">
+                <input type="hidden" id="habitId">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Habit Title</label>
+                    <input type="text" id="habitTitle" required placeholder="e.g. Daily Meditation, 10k Steps" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Category</label>
+                        <select id="habitCategory" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <!-- Dynamic custom categories options -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Target Frequency</label>
+                        <select id="habitFrequency" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Icon (FontAwesome class)</label>
+                    <input type="text" id="habitIcon" placeholder="fa-brain" value="fa-check" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeHabitModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-300 transition-all">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-sky-500/20 transition-all">Save Habit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT EVENT OR REMINDER -->
+    <div id="reminderModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md hidden p-4 animate-fade-in">
+        <div class="glass-card rounded-3xl w-full max-w-lg p-6 shadow-2xl relative animate-scale-up custom-scrollbar max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4" id="reminderModalTitle">Add Event or Reminder</h3>
+            <form id="reminderForm" onsubmit="handleReminderSubmit(event)" class="space-y-4">
+                <input type="hidden" id="reminderId">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Event Title</label>
+                    <input type="text" id="reminderTitle" required placeholder="e.g. Strategy Sync, Yoga Class" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex items-center space-x-2 my-1">
+                    <input type="checkbox" id="reminderAllDay" onchange="toggleAllDayFields()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+                    <label for="reminderAllDay" class="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">All-day Event</label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Date</label>
+                        <input type="date" id="reminderDate" required class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div id="startTimeContainer">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Start Time</label>
+                        <input type="time" id="reminderStartTime" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div id="endTimeContainer">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">End Time</label>
+                        <input type="time" id="reminderEndTime" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Category Tag</label>
+                        <select id="reminderCategory" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <!-- Dynamic Categories -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Priority Level</label>
+                        <select id="reminderPriority" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="Low">Low Priority</option>
+                            <option value="Medium" selected>Medium Priority</option>
+                            <option value="High">High Priority</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Alert Trigger Lead</label>
+                        <select id="reminderLeadTime" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="0">At time of event</option>
+                            <option value="5">5 minutes before</option>
+                            <option value="15" selected>15 minutes before</option>
+                            <option value="30">30 minutes before</option>
+                            <option value="60">1 hour before</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Recurrence</label>
+                        <select id="reminderRecurrence" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="None">One-time Event</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Description / Location</label>
+                    <textarea id="reminderDescription" rows="2" placeholder="Meeting link or details..." class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeReminderModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT NOTE -->
+    <div id="noteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md hidden p-4 animate-fade-in">
+        <div class="glass-card rounded-3xl w-full max-w-lg p-6 shadow-2xl relative animate-scale-up">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4" id="noteModalTitle">Create Note</h3>
+            <form id="noteForm" onsubmit="handleNoteSubmit(event)" class="space-y-4">
+                <input type="hidden" id="noteId">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Title</label>
+                    <input type="text" id="noteTitle" required placeholder="Key takeaway, journal entry..." class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Category</label>
+                        <select id="noteCategory" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tags (comma separated)</label>
+                        <input type="text" id="noteTags" placeholder="Ideas, Goals, Ideas" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Content</label>
+                    <textarea id="noteContent" rows="4" required placeholder="Write details here..." class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="notePinned" class="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer">
+                    <label for="notePinned" class="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">Pin to top</label>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeNoteModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-sky-500/20">Save Note</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Storage Keys
+        const STORAGE_KEY_CATEGORIES = 'habitpulse_categories_v3';
+        const STORAGE_KEY_HABITS = 'habitpulse_habits_v3';
+        const STORAGE_KEY_REMINDERS = 'habitpulse_reminders_v3';
+        const STORAGE_KEY_NOTES = 'habitpulse_notes_v3';
+        const STORAGE_KEY_DAYNOTES = 'habitpulse_daynotes_v3';
+
+        // Default Preserved Categories
+        const DEFAULT_CATEGORIES = [
+            { id: 'cat_health', name: 'Health', icon: 'fa-heart-pulse', color: '#10b981' },
+            { id: 'cat_fitness', name: 'Fitness', icon: 'fa-dumbbell', color: '#f59e0b' },
+            { id: 'cat_work', name: 'Work', icon: 'fa-briefcase', color: '#6366f1' },
+            { id: 'cat_personal', name: 'Personal', icon: 'fa-user', color: '#ec4899' },
+            { id: 'cat_learning', name: 'Learning', icon: 'fa-graduation-cap', color: '#0ea5e9' }
+        ];
+
+        let categories = [];
+        let habits = [];
+        let reminders = [];
+        let notes = [];
+        let dayNotes = {};
+
+        let currentDate = new Date();
+        let selectedCalendarDate = new Date();
+
+        let dashChartInstance = null;
+        let categoryChartInstance = null;
+        let overallChartInstance = null;
+        let activeAlarmReminder = null;
+
+        function getTodayString() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        window.onload = function() {
+            initTheme();
+            loadLocalStorage();
+            updateAllCategoryDropdowns();
+
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            document.getElementById('dashDateString').innerText = new Date().toLocaleDateString('en-US', options);
+
+            renderDashboard();
+            renderRemindersAgenda();
+            renderHabitsList();
+            renderCalendar();
+            renderNotes();
+            renderAnalytics();
+
+            setInterval(checkPendingReminders, 15000);
+            checkPendingReminders();
+        };
+
+        function initTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').className = 'fa-solid fa-sun text-amber-400';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').className = 'fa-solid fa-moon text-slate-600';
+            }
+        }
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('themeIcon').className = 'fa-solid fa-moon text-slate-600';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('themeIcon').className = 'fa-solid fa-sun text-amber-400';
+            }
+            renderDashboardCharts();
+            renderAnalyticsCharts();
+        }
+
+        function loadLocalStorage() {
+            const storedCategories = localStorage.getItem(STORAGE_KEY_CATEGORIES);
+            const storedHabits = localStorage.getItem(STORAGE_KEY_HABITS);
+            const storedReminders = localStorage.getItem(STORAGE_KEY_REMINDERS);
+            const storedNotes = localStorage.getItem(STORAGE_KEY_NOTES);
+            const storedDayNotes = localStorage.getItem(STORAGE_KEY_DAYNOTES);
+
+            categories = storedCategories ? JSON.parse(storedCategories) : DEFAULT_CATEGORIES;
+            habits = storedHabits ? JSON.parse(storedHabits) : [
+                { id: 'h1', title: 'Morning Hydration & Yoga', category: 'Health', frequency: 'Daily', icon: 'fa-droplet', logs: {} },
+                { id: 'h2', title: 'Read 20 Pages', category: 'Learning', frequency: 'Daily', icon: 'fa-book', logs: {} },
+                { id: 'h3', title: 'Deep Work Session', category: 'Work', frequency: 'Daily', icon: 'fa-laptop-code', logs: {} }
+            ];
+            reminders = storedReminders ? JSON.parse(storedReminders) : [
+                { id: 'r1', title: 'Q4 Product Roadmap Sync', date: getTodayString(), startTime: '11:00', endTime: '12:00', allDay: false, category: 'Work', priority: 'High', leadTime: 15, recurrence: 'None', description: 'Align with engineering team', completed: false }
+            ];
+            notes = storedNotes ? JSON.parse(storedNotes) : [
+                { id: 'n1', title: 'Habit Stacking Principle', category: 'Personal', content: 'Pair new habits with existing anchored habits (e.g., After morning coffee -> Meditate 5 mins).', tags: ['Productivity'], pinned: true, createdAt: new Date().toISOString() }
+            ];
+            dayNotes = storedDayNotes ? JSON.parse(storedDayNotes) : {};
+
+            if (!storedCategories) saveCategories();
+            if (!storedHabits) saveHabits();
+            if (!storedReminders) saveReminders();
+            if (!storedNotes) saveNotes();
+        }
+
+        function saveCategories() { localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(categories)); }
+        function saveHabits() { localStorage.setItem(STORAGE_KEY_HABITS, JSON.stringify(habits)); }
+        function saveReminders() { localStorage.setItem(STORAGE_KEY_REMINDERS, JSON.stringify(reminders)); }
+        function saveNotes() { localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(notes)); }
+        function saveDayNotes() { localStorage.setItem(STORAGE_KEY_DAYNOTES, JSON.stringify(dayNotes)); }
+
+        // Category Engine Updates
+        function updateAllCategoryDropdowns() {
+            const dropdowns = ['reminderFilterCategory', 'habitCategoryFilter', 'noteCategoryFilter', 'habitCategory', 'reminderCategory', 'noteCategory'];
+            dropdowns.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const currentValue = el.value;
+                
+                let optionsHTML = id.includes('Filter') ? '<option value="ALL">All Categories</option>' : '';
+                categories.forEach(c => {
+                    optionsHTML += `<option value="${c.name}">${c.name}</option>`;
+                });
+                el.innerHTML = optionsHTML;
+                if (currentValue) el.value = currentValue;
+            });
+
+            document.getElementById('dashCategoriesCount').innerText = categories.length;
+        }
+
+        function openCategoryManagerModal() {
+            renderCategoryList();
+            resetCategoryForm();
+            document.getElementById('categoryManagerModal').classList.remove('hidden');
+        }
+
+        function closeCategoryManagerModal() {
+            document.getElementById('categoryManagerModal').classList.add('hidden');
+        }
+
+        function resetCategoryForm() {
+            document.getElementById('categoryForm').reset();
+            document.getElementById('categoryId').value = '';
+            document.getElementById('categoryColor').value = '#0ea5e9';
+            document.getElementById('categoryIcon').value = 'fa-tag';
+        }
+
+        function handleCategorySubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('categoryId').value;
+            const name = document.getElementById('categoryName').value.trim();
+            const icon = document.getElementById('categoryIcon').value.trim() || 'fa-tag';
+            const color = document.getElementById('categoryColor').value;
+
+            if (id) {
+                const c = categories.find(item => item.id === id);
+                if (c) { c.name = name; c.icon = icon; c.color = color; }
+            } else {
+                categories.push({ id: 'cat_' + Date.now(), name, icon, color });
+            }
+
+            saveCategories();
+            updateAllCategoryDropdowns();
+            renderCategoryList();
+            resetCategoryForm();
+            renderDashboard();
+            renderHabitsList();
+            renderRemindersAgenda();
+            renderNotes();
+            renderAnalytics();
+        }
+
+        function renderCategoryList() {
+            const container = document.getElementById('categoryListContainer');
+            container.innerHTML = '';
+
+            categories.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100/60 dark:bg-slate-800/60 flex items-center justify-between text-xs';
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold" style="background-color: ${c.color}">
+                            <i class="fa-solid ${c.icon}"></i>
+                        </div>
+                        <span class="font-bold text-slate-800 dark:text-white">${c.name}</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="editCategory('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteCategory('${c.id}')" class="p-1 text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function editCategory(id) {
+            const c = categories.find(item => item.id === id);
+            if (c) {
+                document.getElementById('categoryId').value = c.id;
+                document.getElementById('categoryName').value = c.name;
+                document.getElementById('categoryIcon').value = c.icon;
+                document.getElementById('categoryColor').value = c.color;
+            }
+        }
+
+        function deleteCategory(id) {
+            if (categories.length <= 1) {
+                alert("You must keep at least one category.");
+                return;
+            }
+            categories = categories.filter(c => c.id !== id);
+            saveCategories();
+            updateAllCategoryDropdowns();
+            renderCategoryList();
+            renderDashboard();
+            renderHabitsList();
+        }
+
+        function getCategoryObject(categoryName) {
+            return categories.find(c => c.name === categoryName) || { name: categoryName, color: '#64748b', icon: 'fa-tag' };
+        }
+
+        // Notification & Audio Logic
+        function requestNotificationPermission() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        document.getElementById('notifBadge').className = "absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500";
+                    }
+                });
+            }
+        }
+
+        function checkPendingReminders() {
+            const now = new Date();
+            const todayStr = getTodayString();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+            reminders.forEach(r => {
+                if (r.completed || r.dismissed) return;
+                if (r.date === todayStr) {
+                    let triggerMinutes = 0;
+                    if (r.allDay) triggerMinutes = 9 * 60;
+                    else if (r.startTime) {
+                        const [hh, mm] = r.startTime.split(':').map(Number);
+                        triggerMinutes = (hh * 60 + mm) - (parseInt(r.leadTime) || 0);
+                    }
+
+                    if (currentMinutes >= triggerMinutes && currentMinutes <= triggerMinutes + 2 && !r.notified) {
+                        r.notified = true;
+                        saveReminders();
+                        triggerAlarm(r);
+                    }
+                }
+            });
+        }
+
+        function triggerAlarm(reminder) {
+            try {
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("E5", "8n");
+            } catch (e) {}
+
+            activeAlarmReminder = reminder;
+            document.getElementById('alarmTitle').innerText = reminder.title;
+            document.getElementById('alarmTime').innerText = reminder.allDay ? 'All Day Event' : `Scheduled for ${reminder.startTime}`;
+            document.getElementById('alarmBanner').classList.remove('hidden');
+        }
+
+        function dismissActiveAlarm() {
+            if (activeAlarmReminder) {
+                activeAlarmReminder.completed = true;
+                saveReminders();
+                renderDashboard();
+                renderRemindersAgenda();
+            }
+            document.getElementById('alarmBanner').classList.add('hidden');
+        }
+
+        function snoozeActiveAlarm(minutes) {
+            if (activeAlarmReminder) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() + minutes);
+                activeAlarmReminder.date = formatDateKey(now);
+                activeAlarmReminder.startTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                activeAlarmReminder.notified = false;
+                saveReminders();
+            }
+            document.getElementById('alarmBanner').classList.add('hidden');
+        }
+
+        // Tab Switching Engine
+        function switchTab(tabName) {
+            const tabs = ['dashboard', 'reminders', 'habits', 'calendar', 'notes', 'analytics'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                const view = document.getElementById(`view-${t}`);
+                if (t === tabName) {
+                    view.classList.remove('hidden');
+                    btn.className = 'tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 shadow-sm whitespace-nowrap';
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = 'tab-btn px-4 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap';
+                }
+            });
+
+            if (tabName === 'dashboard') renderDashboard();
+            if (tabName === 'reminders') renderRemindersAgenda();
+            if (tabName === 'habits') renderHabitsList();
+            if (tabName === 'calendar') renderCalendar();
+            if (tabName === 'notes') renderNotes();
+            if (tabName === 'analytics') renderAnalytics();
+        }
+
+        function formatDateKey(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function renderDashboard() {
+            const todayKey = getTodayString();
+
+            // Render Habit List
+            const habitList = document.getElementById('dashboardHabitList');
+            habitList.innerHTML = '';
+            let habitDoneCount = 0;
+
+            if (habits.length === 0) {
+                habitList.innerHTML = `<p class="text-xs text-slate-400 text-center py-6 italic">No habits configured yet.</p>`;
+            } else {
+                habits.forEach(h => {
+                    const isDone = !!(h.logs && h.logs[todayKey]);
+                    if (isDone) habitDoneCount++;
+                    const streak = calculateStreak(h);
+                    const catObj = getCategoryObject(h.category);
+
+                    const el = document.createElement('div');
+                    el.className = `p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
+                        isDone 
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40' 
+                        : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300'
+                    }`;
+
+                    el.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <button onclick="toggleHabitToday('${h.id}')" class="check-bounce w-6 h-6 rounded-lg flex items-center justify-center ${
+                                isDone 
+                                ? 'bg-emerald-500 text-white shadow-sm' 
+                                : 'border-2 border-slate-300 dark:border-slate-600 text-transparent hover:border-sky-500'
+                            }">
+                                <i class="fa-solid fa-check text-xs"></i>
+                            </button>
+                            <div>
+                                <h4 class="font-bold text-xs ${isDone ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}">${h.title}</h4>
+                                <div class="flex items-center space-x-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    <span class="px-1.5 py-0.5 rounded-md font-semibold text-white" style="background-color:${catObj.color}">${h.category}</span>
+                                    <span><i class="fa-solid fa-fire text-amber-500 mr-0.5"></i>${streak}d streak</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    habitList.appendChild(el);
+                });
+            }
+
+            // Render Schedule
+            const remList = document.getElementById('dashboardRemindersList');
+            remList.innerHTML = '';
+            const todayReminders = reminders.filter(r => r.date === todayKey);
+            let remDoneCount = 0;
+
+            if (todayReminders.length === 0) {
+                remList.innerHTML = `<p class="text-xs text-slate-400 text-center py-6 italic">No events scheduled for today.</p>`;
+            } else {
+                todayReminders.forEach(r => {
+                    if (r.completed) remDoneCount++;
+                    const catObj = getCategoryObject(r.category);
+
+                    const el = document.createElement('div');
+                    el.className = `p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
+                        r.completed 
+                        ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/40' 
+                        : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/80'
+                    }`;
+
+                    el.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <button onclick="toggleReminderCompleted('${r.id}')" class="check-bounce w-6 h-6 rounded-lg flex items-center justify-center ${
+                                r.completed 
+                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                : 'border-2 border-slate-300 dark:border-slate-600 hover:border-indigo-500 text-transparent'
+                            }">
+                                <i class="fa-solid fa-check text-xs"></i>
+                            </button>
+                            <div>
+                                <h4 class="font-bold text-xs ${r.completed ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}">${r.title}</h4>
+                                <div class="flex items-center space-x-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    <span class="px-1.5 py-0.5 rounded-md font-semibold text-white" style="background-color:${catObj.color}">${r.category}</span>
+                                    <span><i class="fa-regular fa-clock mr-0.5"></i>${r.allDay ? 'All Day' : r.startTime}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    remList.appendChild(el);
+                });
+            }
+
+            const totalHabits = habits.length;
+            const habitPct = totalHabits > 0 ? Math.round((habitDoneCount / totalHabits) * 100) : 0;
+            document.getElementById('dashTodayProgress').innerText = `${habitPct}%`;
+            document.getElementById('dashTodayCount').innerText = `${habitDoneCount} of ${totalHabits} completed`;
+
+            document.getElementById('dashRemindersCount').innerText = todayReminders.length;
+            document.getElementById('dashRemindersPending').innerText = `${todayReminders.length - remDoneCount} pending events`;
+
+            let maxStreak = 0;
+            habits.forEach(h => { const s = calculateStreak(h); if (s > maxStreak) maxStreak = s; });
+            document.getElementById('dashBestStreak').innerText = `${maxStreak} Days`;
+
+            renderDashboardCharts(habitDoneCount, totalHabits - habitDoneCount, remDoneCount, todayReminders.length - remDoneCount);
+        }
+
+        function renderDashboardCharts(hDone, hPending, rDone, rPending) {
+            const ctx = document.getElementById('dashPieChart').getContext('2d');
+            if (dashChartInstance) dashChartInstance.destroy();
+
+            dashChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Habits Done', 'Habits Pending', 'Events Done', 'Events Pending'],
+                    datasets: [{
+                        data: [hDone, Math.max(0, hPending), rDone, Math.max(0, rPending)],
+                        backgroundColor: ['#10b981', '#cbd5e1', '#6366f1', '#a5b4fc'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 } } } }
+                }
+            });
+        }
+
+        function renderRemindersAgenda() {
+            const grid = document.getElementById('remindersAgendaGrid');
+            const catFilter = document.getElementById('reminderFilterCategory').value;
+            const prioFilter = document.getElementById('reminderFilterPriority').value;
+            grid.innerHTML = '';
+
+            let filtered = reminders.filter(r => {
+                const matchCat = catFilter === 'ALL' || r.category === catFilter;
+                const matchPrio = prioFilter === 'ALL' || r.priority === prioFilter;
+                return matchCat && matchPrio;
+            });
+
+            const todayStr = getTodayString();
+            const overdue = filtered.filter(r => r.date < todayStr && !r.completed);
+            const todayList = filtered.filter(r => r.date === todayStr && !r.completed);
+            const upcoming = filtered.filter(r => r.date > todayStr && !r.completed);
+            const completed = filtered.filter(r => r.completed);
+
+            function createGroupCard(title, items, iconClass, headerColor) {
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-3xl p-5 shadow-sm';
+
+                let listHTML = '';
+                if (items.length === 0) {
+                    listHTML = `<p class="text-xs text-slate-400 py-3 italic">No items found</p>`;
+                } else {
+                    listHTML = items.map(r => {
+                        const catObj = getCategoryObject(r.category);
+                        return `
+                            <div class="p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/40 flex items-start justify-between gap-3 my-2">
+                                <div class="flex items-start space-x-3">
+                                    <button onclick="toggleReminderCompleted('${r.id}')" class="check-bounce mt-0.5 w-5 h-5 rounded-md flex items-center justify-center ${r.completed ? 'bg-indigo-600 text-white' : 'border-2 border-slate-300 dark:border-slate-600 text-transparent hover:border-indigo-500'}">
+                                        <i class="fa-solid fa-check text-[10px]"></i>
+                                    </button>
+                                    <div>
+                                        <h4 class="font-bold text-xs text-slate-800 dark:text-slate-100 ${r.completed ? 'line-through text-slate-400' : ''}">${r.title}</h4>
+                                        <div class="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                            <span class="px-1.5 py-0.5 rounded font-semibold text-white" style="background-color:${catObj.color}">${r.category}</span>
+                                            <span><i class="fa-regular fa-calendar mr-1"></i>${r.date}</span>
+                                            <span><i class="fa-regular fa-clock mr-1"></i>${r.allDay ? 'All Day' : r.startTime}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-1">
+                                    <button onclick="openReminderModal('${r.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-pen text-xs"></i></button>
+                                    <button onclick="deleteReminder('${r.id}')" class="p-1 text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-center space-x-2 mb-3 pb-2 border-b border-slate-200/60 dark:border-slate-700/60">
+                        <i class="fa-solid ${iconClass} ${headerColor} text-sm"></i>
+                        <h3 class="font-bold text-sm text-slate-800 dark:text-white">${title} (${items.length})</h3>
+                    </div>
+                    <div>${listHTML}</div>
+                `;
+                return card;
+            }
+
+            grid.appendChild(createGroupCard('Overdue Events', overdue, 'fa-circle-exclamation', 'text-rose-500'));
+            grid.appendChild(createGroupCard("Today's Agenda", todayList, 'fa-calendar-day', 'text-indigo-500'));
+            grid.appendChild(createGroupCard('Upcoming Events', upcoming, 'fa-calendar-week', 'text-sky-500'));
+            grid.appendChild(createGroupCard('Completed Events', completed, 'fa-circle-check', 'text-emerald-500'));
+        }
+
+        function renderHabitsList() {
+            const grid = document.getElementById('allHabitsGrid');
+            const categoryFilter = document.getElementById('habitCategoryFilter').value;
+            grid.innerHTML = '';
+
+            const filtered = categoryFilter === 'ALL' ? habits : habits.filter(h => h.category === categoryFilter);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs">No habits found for selected filter.</div>`;
+                return;
+            }
+
+            filtered.forEach(habit => {
+                const streak = calculateStreak(habit);
+                const catObj = getCategoryObject(habit.category);
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 rounded-2xl text-white flex items-center justify-center text-base font-bold shadow-md" style="background-color:${catObj.color}">
+                                <i class="fa-solid ${habit.icon || 'fa-check'}"></i>
+                            </div>
+                            <div class="flex space-x-1">
+                                <button onclick="openHabitModal('${habit.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-600"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deleteHabit('${habit.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>
+                        </div>
+                        <h3 class="font-bold text-slate-800 dark:text-white text-sm mb-1">${habit.title}</h3>
+                        <div class="flex items-center space-x-2 mb-4">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style="background-color:${catObj.color}">${habit.category}</span>
+                            <span class="text-[10px] text-slate-400 font-medium">• ${habit.frequency}</span>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                        <span class="text-slate-500 font-medium">Streak:</span>
+                        <span class="font-bold text-amber-500"><i class="fa-solid fa-fire mr-1"></i>${streak} Days</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleHabitToday(habitId) {
+            const todayKey = getTodayString();
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            if (!habit.logs) habit.logs = {};
+            const stateBefore = !!habit.logs[todayKey];
+            habit.logs[todayKey] = !stateBefore;
+
+            saveHabits();
+            renderDashboard();
+
+            if (!stateBefore) {
+                confetti({ particleCount: 40, spread: 50, origin: { y: 0.8 } });
+            }
+        }
+
+        function calculateStreak(habit) {
+            if (!habit.logs) return 0;
+            let streak = 0;
+            let checkDate = new Date();
+            let key = formatDateKey(checkDate);
+
+            if (!habit.logs[key]) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                key = formatDateKey(checkDate);
+            }
+
+            while (habit.logs[key]) {
+                streak++;
+                checkDate.setDate(checkDate.getDate() - 1);
+                key = formatDateKey(checkDate);
+            }
+            return streak;
+        }
+
+        function openHabitModal(habitId = null) {
+            const modal = document.getElementById('habitModal');
+            document.getElementById('habitForm').reset();
+
+            if (habitId) {
+                const habit = habits.find(h => h.id === habitId);
+                if (habit) {
+                    document.getElementById('habitModalTitle').innerText = 'Edit Habit';
+                    document.getElementById('habitId').value = habit.id;
+                    document.getElementById('habitTitle').value = habit.title;
+                    document.getElementById('habitCategory').value = habit.category;
+                    document.getElementById('habitFrequency').value = habit.frequency;
+                    document.getElementById('habitIcon').value = habit.icon || 'fa-check';
+                }
+            } else {
+                document.getElementById('habitModalTitle').innerText = 'Add New Habit';
+                document.getElementById('habitId').value = '';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeHabitModal() { document.getElementById('habitModal').classList.add('hidden'); }
+
+        function handleHabitSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('habitId').value;
+            const title = document.getElementById('habitTitle').value;
+            const category = document.getElementById('habitCategory').value;
+            const frequency = document.getElementById('habitFrequency').value;
+            const icon = document.getElementById('habitIcon').value || 'fa-check';
+
+            if (id) {
+                const habit = habits.find(h => h.id === id);
+                if (habit) { habit.title = title; habit.category = category; habit.frequency = frequency; habit.icon = icon; }
+            } else {
+                habits.push({ id: 'h_' + Date.now(), title, category, frequency, icon, logs: {} });
+            }
+
+            saveHabits();
+            closeHabitModal();
+            renderDashboard();
+            renderHabitsList();
+        }
+
+        function deleteHabit(id) {
+            habits = habits.filter(h => h.id !== id);
+            saveHabits();
+            renderDashboard();
+            renderHabitsList();
+        }
+
+        // Calendar Engine
+        function renderCalendar() {
+            const monthYearText = document.getElementById('calendarMonthYear');
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            monthYearText.innerText = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                const blank = document.createElement('div');
+                blank.className = 'min-h-[85px] bg-slate-100/30 dark:bg-slate-900/30 rounded-2xl border border-transparent';
+                grid.appendChild(blank);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateObj = new Date(year, month, day);
+                const dateKey = formatDateKey(dateObj);
+
+                const dayReminders = reminders.filter(r => r.date === dateKey);
+                let habitCompleted = 0;
+                habits.forEach(h => { if (h.logs && h.logs[dateKey]) habitCompleted++; });
+
+                const cell = document.createElement('div');
+                cell.className = `min-h-[85px] p-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/70 flex flex-col justify-between cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all duration-200`;
+                cell.onclick = () => selectCalendarDay(dateObj);
+
+                const badgesHTML = dayReminders.slice(0, 2).map(r => {
+                    const catObj = getCategoryObject(r.category);
+                    return `
+                        <div class="text-[9px] px-1.5 py-0.5 rounded-md truncate font-bold text-white" style="background-color:${catObj.color}">
+                            ${r.title}
+                        </div>
+                    `;
+                }).join('');
+
+                cell.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold ${dateKey === getTodayString() ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center' : 'text-slate-700 dark:text-slate-200'}">${day}</span>
+                        ${habitCompleted > 0 ? `<span class="text-[10px] text-emerald-600 font-bold"><i class="fa-solid fa-check"></i> ${habitCompleted}</span>` : ''}
+                    </div>
+                    <div class="space-y-1 my-1">${badgesHTML}</div>
+                `;
+                grid.appendChild(cell);
+            }
+        }
+
+        function prevMonth() { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); }
+        function nextMonth() { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); }
+        function currentMonth() { currentDate = new Date(); renderCalendar(); }
+
+        function selectCalendarDay(dateObj) {
+            selectedCalendarDate = dateObj;
+            const dateKey = formatDateKey(dateObj);
+            const card = document.getElementById('dayDetailCard');
+            card.classList.remove('hidden');
+
+            document.getElementById('selectedDayTitle').innerText = `Schedule for ${dateObj.toDateString()}`;
+
+            const remContainer = document.getElementById('selectedDayReminders');
+            remContainer.innerHTML = '';
+            const dayReminders = reminders.filter(r => r.date === dateKey);
+
+            if (dayReminders.length === 0) {
+                remContainer.innerHTML = `<p class="text-xs text-slate-400 italic">No events scheduled.</p>`;
+            } else {
+                dayReminders.forEach(r => {
+                    const el = document.createElement('div');
+                    el.className = 'p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs flex items-center justify-between';
+                    el.innerHTML = `
+                        <span class="${r.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'} font-semibold">${r.title}</span>
+                        <button onclick="toggleReminderCompleted('${r.id}')" class="text-[10px] font-bold px-2 py-1 rounded-lg ${r.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 dark:bg-slate-700'}">
+                            ${r.completed ? 'Done' : 'Mark Done'}
+                        </button>
+                    `;
+                    remContainer.appendChild(el);
+                });
+            }
+
+            const habitContainer = document.getElementById('selectedDayHabits');
+            habitContainer.innerHTML = '';
+            habits.forEach(h => {
+                const isDone = h.logs && h.logs[dateKey];
+                const el = document.createElement('div');
+                el.className = 'p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs flex items-center justify-between';
+                el.innerHTML = `
+                    <span>${h.title}</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${isDone ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'text-slate-400'}">
+                        ${isDone ? 'Completed' : 'Pending'}
+                    </span>
+                `;
+                habitContainer.appendChild(el);
+            });
+
+            document.getElementById('selectedDayNote').value = dayNotes[dateKey] || '';
+        }
+
+        function saveDayNote() {
+            const dateKey = formatDateKey(selectedCalendarDate);
+            const text = document.getElementById('selectedDayNote').value.trim();
+            if (text) dayNotes[dateKey] = text; else delete dayNotes[dateKey];
+            saveDayNotes();
+            renderCalendar();
+        }
+
+        // Notes Engine
+        function renderNotes() {
+            const grid = document.getElementById('notesGrid');
+            const search = document.getElementById('noteSearchInput').value.toLowerCase();
+            const catFilter = document.getElementById('noteCategoryFilter').value;
+            grid.innerHTML = '';
+
+            let filtered = notes.filter(n => {
+                const matchSearch = n.title.toLowerCase().includes(search) || 
+                                    n.content.toLowerCase().includes(search) ||
+                                    (n.tags && n.tags.some(t => t.toLowerCase().includes(search)));
+                const matchCat = catFilter === 'ALL' || n.category === catFilter;
+                return matchSearch && matchCat;
+            });
+
+            filtered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs">No notes found.</div>`;
+                return;
+            }
+
+            filtered.forEach(note => {
+                const catObj = getCategoryObject(note.category);
+                const card = document.createElement('div');
+                card.className = `glass-card rounded-3xl p-5 shadow-sm flex flex-col justify-between transition-all duration-300 ${
+                    note.pinned ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50/20' : ''
+                }`;
+
+                const tagHTML = (note.tags || []).map(t => `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-semibold mr-1">#${t}</span>`).join('');
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between mb-2">
+                            <h3 class="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-1.5">
+                                ${note.pinned ? '<i class="fa-solid fa-thumbtack text-amber-500 text-xs"></i>' : ''}
+                                ${note.title}
+                            </h3>
+                            <div class="flex space-x-1">
+                                <button onclick="openNoteModal('${note.id}')" class="p-1 text-slate-400 hover:text-sky-600"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deleteNote('${note.id}')" class="p-1 text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>
+                        </div>
+                        <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold text-white mb-2" style="background-color:${catObj.color}">${note.category || 'General'}</span>
+                        <p class="text-xs text-slate-600 dark:text-slate-300 mb-4 whitespace-pre-line line-clamp-4">${note.content}</p>
+                    </div>
+                    <div>
+                        <div class="mb-2 flex flex-wrap gap-1">${tagHTML}</div>
+                        <div class="text-[10px] text-slate-400 font-medium">${new Date(note.createdAt).toLocaleDateString()}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openNoteModal(noteId = null) {
+            const modal = document.getElementById('noteModal');
+            document.getElementById('noteForm').reset();
+
+            if (noteId) {
+                const note = notes.find(n => n.id === noteId);
+                if (note) {
+                    document.getElementById('noteModalTitle').innerText = 'Edit Note';
+                    document.getElementById('noteId').value = note.id;
+                    document.getElementById('noteTitle').value = note.title;
+                    document.getElementById('noteCategory').value = note.category || categories[0]?.name;
+                    document.getElementById('noteTags').value = (note.tags || []).join(', ');
+                    document.getElementById('noteContent').value = note.content;
+                    document.getElementById('notePinned').checked = !!note.pinned;
+                }
+            } else {
+                document.getElementById('noteModalTitle').innerText = 'Create Note';
+                document.getElementById('noteId').value = '';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeNoteModal() { document.getElementById('noteModal').classList.add('hidden'); }
+
+        function handleNoteSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('noteId').value;
+            const title = document.getElementById('noteTitle').value;
+            const category = document.getElementById('noteCategory').value;
+            const rawTags = document.getElementById('noteTags').value;
+            const content = document.getElementById('noteContent').value;
+            const pinned = document.getElementById('notePinned').checked;
+            const tags = rawTags ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+            if (id) {
+                const note = notes.find(n => n.id === id);
+                if (note) { note.title = title; note.category = category; note.tags = tags; note.content = content; note.pinned = pinned; }
+            } else {
+                notes.push({ id: 'n_' + Date.now(), title, category, tags, content, pinned, createdAt: new Date().toISOString() });
+            }
+
+            saveNotes();
+            closeNoteModal();
+            renderNotes();
+        }
+
+        function deleteNote(id) {
+            notes = notes.filter(n => n.id !== id);
+            saveNotes();
+            renderNotes();
+        }
+
+        // Reminders & Event Handlers
+        function openReminderModal(reminderId = null) {
+            const modal = document.getElementById('reminderModal');
+            document.getElementById('reminderForm').reset();
+
+            if (reminderId) {
+                const r = reminders.find(item => item.id === reminderId);
+                if (r) {
+                    document.getElementById('reminderModalTitle').innerText = 'Edit Event / Reminder';
+                    document.getElementById('reminderId').value = r.id;
+                    document.getElementById('reminderTitle').value = r.title;
+                    document.getElementById('reminderDate').value = r.date;
+                    document.getElementById('reminderStartTime').value = r.startTime || '';
+                    document.getElementById('reminderEndTime').value = r.endTime || '';
+                    document.getElementById('reminderAllDay').checked = !!r.allDay;
+                    document.getElementById('reminderCategory').value = r.category;
+                    document.getElementById('reminderPriority').value = r.priority;
+                    document.getElementById('reminderLeadTime').value = r.leadTime || 15;
+                    document.getElementById('reminderRecurrence').value = r.recurrence || 'None';
+                    document.getElementById('reminderDescription').value = r.description || '';
+                }
+            } else {
+                document.getElementById('reminderModalTitle').innerText = 'Add Event or Reminder';
+                document.getElementById('reminderId').value = '';
+                document.getElementById('reminderDate').value = getTodayString();
+                document.getElementById('reminderStartTime').value = '09:00';
+            }
+
+            toggleAllDayFields();
+            modal.classList.remove('hidden');
+        }
+
+        function openReminderModalWithDate() {
+            openReminderModal();
+            document.getElementById('reminderDate').value = formatDateKey(selectedCalendarDate);
+        }
+
+        function toggleAllDayFields() {
+            const isAllDay = document.getElementById('reminderAllDay').checked;
+            document.getElementById('startTimeContainer').style.display = isAllDay ? 'none' : 'block';
+            document.getElementById('endTimeContainer').style.display = isAllDay ? 'none' : 'block';
+        }
+
+        function closeReminderModal() { document.getElementById('reminderModal').classList.add('hidden'); }
+
+        function handleReminderSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('reminderId').value;
+            const title = document.getElementById('reminderTitle').value;
+            const date = document.getElementById('reminderDate').value;
+            const startTime = document.getElementById('reminderStartTime').value;
+            const endTime = document.getElementById('reminderEndTime').value;
+            const allDay = document.getElementById('reminderAllDay').checked;
+            const category = document.getElementById('reminderCategory').value;
+            const priority = document.getElementById('reminderPriority').value;
+            const leadTime = document.getElementById('reminderLeadTime').value;
+            const recurrence = document.getElementById('reminderRecurrence').value;
+            const description = document.getElementById('reminderDescription').value;
+
+            if (id) {
+                const r = reminders.find(item => item.id === id);
+                if (r) {
+                    r.title = title; r.date = date; r.startTime = startTime; r.endTime = endTime;
+                    r.allDay = allDay; r.category = category; r.priority = priority;
+                    r.leadTime = leadTime; r.recurrence = recurrence; r.description = description;
+                    r.notified = false;
+                }
+            } else {
+                reminders.push({
+                    id: 'r_' + Date.now(),
+                    title, date, startTime, endTime, allDay, category, priority,
+                    leadTime, recurrence, description, completed: false, notified: false
+                });
+            }
+
+            saveReminders();
+            closeReminderModal();
+            renderDashboard();
+            renderRemindersAgenda();
+            renderCalendar();
+        }
+
+        function toggleReminderCompleted(id) {
+            const r = reminders.find(item => item.id === id);
+            if (r) {
+                r.completed = !r.completed;
+                saveReminders();
+                renderDashboard();
+                renderRemindersAgenda();
+                renderCalendar();
+            }
+        }
+
+        function deleteReminder(id) {
+            reminders = reminders.filter(r => r.id !== id);
+            saveReminders();
+            renderDashboard();
+            renderRemindersAgenda();
+            renderCalendar();
+        }
+
+        // Analytics Engine
+        function renderAnalytics() {
+            renderAnalyticsCharts();
+            renderAnalyticsTable();
+        }
+
+        function renderAnalyticsCharts() {
+            const categoryData = {};
+            categories.forEach(c => { categoryData[c.name] = { done: 0, total: 0, color: c.color }; });
+
+            habits.forEach(h => {
+                if (!categoryData[h.category]) {
+                    categoryData[h.category] = { done: 0, total: 0, color: '#0ea5e9' };
+                }
+                const logs = h.logs || {};
+                const keys = Object.keys(logs);
+                categoryData[h.category].done += keys.filter(k => logs[k]).length;
+                categoryData[h.category].total += Math.max(keys.length, 1);
+            });
+
+            const catLabels = Object.keys(categoryData);
+            const catColors = catLabels.map(cat => categoryData[cat].color);
+            const catPercentages = catLabels.map(cat => Math.round((categoryData[cat].done / categoryData[cat].total) * 100));
+
+            const catCtx = document.getElementById('categoryPieChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+
+            categoryChartInstance = new Chart(catCtx, {
+                type: 'pie',
+                data: {
+                    labels: catLabels,
+                    datasets: [{
+                        data: catPercentages,
+                        backgroundColor: catColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 } } } } }
+            });
+
+            let totalDoneAllTime = 0;
+            let totalLoggedDays = 0;
+            habits.forEach(h => {
+                const logs = h.logs || {};
+                Object.keys(logs).forEach(k => { totalLoggedDays++; if (logs[k]) totalDoneAllTime++; });
+            });
+
+            const overallCtx = document.getElementById('overallDoughnutChart').getContext('2d');
+            if (overallChartInstance) overallChartInstance.destroy();
+
+            overallChartInstance = new Chart(overallCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Completed Logs', 'Missed Logs'],
+                    datasets: [{
+                        data: [totalDoneAllTime, Math.max(0, totalLoggedDays - totalDoneAllTime)],
+                        backgroundColor: ['#10b981', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 } } } } }
+            });
+        }
+
+        function renderAnalyticsTable() {
+            const tbody = document.getElementById('analyticsTableBody');
+            tbody.innerHTML = '';
+
+            habits.forEach(h => {
+                const logs = h.logs || {};
+                const logKeys = Object.keys(logs);
+                const doneCount = logKeys.filter(k => logs[k]).length;
+                const totalLogged = logKeys.length || 1;
+                const pct = Math.round((doneCount / totalLogged) * 100);
+                const streak = calculateStreak(h);
+                const catObj = getCategoryObject(h.category);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <i class="fa-solid ${h.icon || 'fa-check'}" style="color:${catObj.color}"></i> ${h.title}
+                    </td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style="background-color:${catObj.color}">${h.category}</span></td>
+                    <td class="p-3 font-bold text-amber-500"><i class="fa-solid fa-fire mr-1"></i>${streak} d</td>
+                    <td class="p-3">${doneCount} times</td>
+                    <td class="p-3 font-bold ${pct >= 70 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'}">${pct}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+</body>
+</html>
